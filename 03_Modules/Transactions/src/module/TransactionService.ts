@@ -123,7 +123,7 @@ export class TransactionService {
       return response;
     } else {
       if (
-        authorization.concurrentTransaction === true &&
+        !authorization.concurrentTransaction &&
         transactionEvent.eventType === OCPP2_0_1.TransactionEventEnumType.Started
       ) {
         const hasConcurrent = await this._hasConcurrentTransactions(tenantId, authorization.id);
@@ -237,7 +237,7 @@ export class TransactionService {
       }
 
       // Check concurrent transactions (only reject if not allowed)
-      if (authorization.concurrentTransaction === true) {
+      if (!authorization.concurrentTransaction) {
         const hasConcurrent = await this._hasConcurrentTransactions(tenantId, authorization.id);
         if (hasConcurrent) {
           response.idTagInfo.status = OCPP1_6.StartTransactionResponseStatus.ConcurrentTx;
