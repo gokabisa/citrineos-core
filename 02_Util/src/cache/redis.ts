@@ -58,28 +58,32 @@ export class RedisCache implements ICache {
     return new Promise((resolve) => {
       // Create a Redis subscriber to listen for operations affecting the key
       const subscriber = createClient();
+      let closed = false;
+
+      const safeQuit = (): void => {
+        if (closed) return;
+        closed = true;
+        subscriber
+          .quit()
+          .then()
+          .catch((error) => {
+            if (error?.name === 'ClientClosedError') return;
+            console.error('Error closing Redis subscriber', error);
+          });
+      };
+
       // Channel: Key-space, message: the name of the event, which is the command executed on the key
       subscriber
         .subscribe(`__keyspace@0__:${key}`, (channel, message) => {
           switch (message) {
             case 'set':
               resolve(this.get(key, namespace, classConstructor));
-              subscriber
-                .quit()
-                .then()
-                .catch((error) => {
-                  console.log('Error quitting subscriber', error);
-                });
+              safeQuit();
               break;
             case 'del':
             case 'expire':
               resolve(null);
-              subscriber
-                .quit()
-                .then()
-                .catch((error) => {
-                  console.log('Error quitting subscriber', error);
-                });
+              safeQuit();
               break;
             default:
               // Do nothing
@@ -88,16 +92,11 @@ export class RedisCache implements ICache {
         })
         .then()
         .catch((error) => {
-          console.log('Error creating Redis subscriber', error);
+          console.error('Error creating Redis subscriber', error);
         });
       setTimeout(() => {
         resolve(this.get(key, namespace, classConstructor));
-        subscriber
-          .quit()
-          .then()
-          .catch((error) => {
-            console.log('Error closing Redis subscriber', error);
-          });
+        safeQuit();
       }, waitSeconds * 1000);
     });
   }
